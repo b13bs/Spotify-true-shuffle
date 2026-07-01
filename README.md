@@ -1,6 +1,6 @@
 # Spotify True Shuffle
 
-## Human Words
+## Human Words 🖐️
 
 Spotify shuffle sucks. It's full of biases, it tries to predict your habits and what you may want to hear, it prioritizes data saving and caching.
 
@@ -14,7 +14,7 @@ Note to the pedants out there: of course it's not true random like the name sugg
 
 *Gloire aux PRNGs qui font la job*
 
-## Slop 
+## Slop 🤖
 
 ### Description
 
