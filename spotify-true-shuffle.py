@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create private Spotify playlists from liked songs in true random order."""
+"""Create Spotify playlists from liked songs in true random order."""
 
 from __future__ import annotations
 
@@ -36,8 +36,7 @@ PLAYLIST_MARKER = "True random"
 PLAYLIST_PREFIX = "\U0001f3b2 True random"
 SCOPES = (
     "user-library-read",
-    "playlist-read-private",
-    "playlist-modify-private",
+    "playlist-modify-public",
 )
 API_BASE = "https://api.spotify.com/v1"
 ACCOUNTS_BASE = "https://accounts.spotify.com"
@@ -75,7 +74,7 @@ def parse_args() -> Config:
     script_dir = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(
         prog="spotify-true-shuffle.py",
-        description="Create a private Spotify playlist from all liked songs in random order.",
+        description="Create a Spotify playlist from all liked songs in random order.",
     )
     parser.add_argument(
         "--action",
@@ -415,17 +414,11 @@ class SpotifyClient:
         add_to_created_playlist = method == "POST" and re.fullmatch(
             r"/playlists/[^/]+/items", path_or_url
         )
-        update_created_playlist = method == "PUT" and re.fullmatch(
-            r"/playlists/[^/]+", path_or_url
-        )
         if add_to_created_playlist:
             playlist_id = path_or_url.split("/")[2]
             add_to_created_playlist = playlist_id in self.created_playlist_ids
-        if update_created_playlist:
-            playlist_id = path_or_url.split("/")[2]
-            update_created_playlist = playlist_id in self.created_playlist_ids
 
-        if not (create_playlist or add_to_created_playlist or update_created_playlist):
+        if not (create_playlist or add_to_created_playlist):
             raise SpotifyTrueShuffleError(
                 f"Refusing Spotify write outside allowed scope: {method} {path_or_url}"
             )
@@ -509,66 +502,23 @@ class SpotifyClient:
         )
         return uris
 
-    def create_private_playlist(self, name: str, description: str) -> dict[str, Any]:
-        self.logger.info("Creating private playlist name=%r", name)
+    def create_spotify_playlist(self, name: str, description: str) -> dict[str, Any]:
+        self.logger.info("Creating playlist name=%r", name)
         playlist = self.api(
             "/me/playlists",
             method="POST",
             payload={
                 "name": name,
-                "public": False,
                 "description": description,
             },
         )
         self.created_playlist_ids.add(playlist["id"])
-        self.ensure_created_playlist_private(playlist["id"])
-        playlist["public"] = False
         self.logger.info(
-            "Created private playlist id=%s name=%r",
+            "Created playlist id=%s name=%r",
             playlist["id"],
             playlist.get("name", name),
         )
         return playlist
-
-    def update_created_playlist_visibility(self, playlist_id: str, public: bool) -> None:
-        self.logger.info(
-            "Setting playlist visibility playlist_id=%s public=%s",
-            playlist_id,
-            public,
-        )
-        self.api(
-            f"/playlists/{urllib.parse.quote(playlist_id)}",
-            method="PUT",
-            payload={"public": public},
-        )
-
-    def ensure_created_playlist_private(self, playlist_id: str) -> None:
-        for attempt in range(1, 4):
-            details = self.playlist_details(playlist_id)
-            reported_public = details.get("public")
-            self.logger.info(
-                "Privacy verification attempt=%s playlist_id=%s reported_public=%r",
-                attempt,
-                playlist_id,
-                reported_public,
-            )
-            if reported_public is False:
-                return
-
-            self.logger.warning(
-                "Playlist is not private after creation; forcing private playlist_id=%s reported_public=%r",
-                playlist_id,
-                reported_public,
-            )
-            self.update_created_playlist_visibility(playlist_id, False)
-            time.sleep(1)
-
-        details = self.playlist_details(playlist_id)
-        if details.get("public") is not False:
-            raise SpotifyTrueShuffleError(
-                "Created playlist still reports as public after forcing private; "
-                f"playlist_id={playlist_id}. Refusing to add tracks."
-            )
 
     def add_tracks(self, playlist_id: str, uris: list[str]) -> None:
         total_batches = (len(uris) + 99) // 100
@@ -635,16 +585,6 @@ def playlist_track_total(playlist: dict[str, Any], item_total: int | None = None
     return str(total) if total is not None else "unknown"
 
 
-def playlist_visibility(playlist: dict[str, Any]) -> str:
-    if playlist.get("collaborative"):
-        return "collaborative"
-    if playlist.get("public") is True:
-        return "public"
-    if playlist.get("public") is False:
-        return "private"
-    return "visibility unknown"
-
-
 def list_playlists(client: SpotifyClient, output: QuietAwareLogger) -> None:
     playlists = true_random_playlists(client.all_current_user_playlists())
     output.logger.info("Listing %s true-random playlists", len(playlists))
@@ -659,11 +599,10 @@ def list_playlists(client: SpotifyClient, output: QuietAwareLogger) -> None:
             item_total = client.playlist_item_total(playlist_id)
         owner = playlist.get("owner") or {}
         output.user(
-            "%s | %s tracks | created: %s | %s | owner: %s | %s",
+            "%s | %s tracks | created: %s | owner: %s | %s",
             playlist.get("name", "(unnamed)"),
             playlist_track_total(playlist, item_total),
             created_at_from_description(playlist.get("description")),
-            playlist_visibility(playlist),
             owner.get("display_name") or owner.get("id") or "unknown",
             playlist.get("external_urls", {}).get("spotify", ""),
         )
@@ -680,10 +619,10 @@ def create_playlist(client: SpotifyClient, output: QuietAwareLogger) -> None:
     output.logger.info("Shuffling %s liked Spotify track URIs", len(uris))
     secrets.SystemRandom().shuffle(uris)
     output.logger.debug("Shuffle complete using secrets.SystemRandom")
-    playlist = client.create_private_playlist(
+    playlist = client.create_spotify_playlist(
         name,
         (
-            f"Private true-random shuffle of {len(uris)} liked songs. "
+            f"True-random shuffle of {len(uris)} liked songs. "
             f"Created: {datetime.datetime.now().astimezone().isoformat(timespec='seconds')}"
         ),
     )

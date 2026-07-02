@@ -18,8 +18,8 @@ Note to the pedants out there: of course it's not true random like the name sugg
 
 ### Description
 
-Create private Spotify playlists from all liked songs using the operating
-system cryptographic random source.
+Create Spotify playlists from all liked songs using the operating system
+cryptographic random source.
 
 ### Spotify setup
 
@@ -60,8 +60,8 @@ Cron-friendly run with no stdout:
 ./spotify-true-shuffle.py --action create --quiet --log-level INFO
 ```
 
-Logs are written to `spotify-true-shuffle.log` by default. Playlists are private
-and named with an incrementing prefix like `🎲 True random #1`.
+Logs are written to `spotify-true-shuffle.log` by default. Playlists are named
+with an incrementing prefix like `🎲 True random #1`.
 
 Stdout stays concise for interactive use. Use `--log-level DEBUG` when you want
 detailed request, page, and batch progress in `spotify-true-shuffle.log`.
@@ -75,7 +75,3 @@ Management allowlist.
 
 If a run failed after creating an empty playlist, delete that empty playlist by
 hand in Spotify before running again.
-
-The script verifies that newly created playlists report as private before adding
-tracks. If Spotify still reports the playlist as public after retries, the run
-fails and leaves the empty playlist for manual deletion.
